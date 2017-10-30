@@ -35,9 +35,9 @@ JiffyGenerator JiffyCryptoAnalysis::generator(int N1, int N2) const {
     auto l2 = LFSR(this->equation2, states[1], this->cutoff2);
     auto l3 = LFSR(this->equation3, states[2], this->cutoff3);
 
-    std::cout << "States: " << std::bitset<8>(states[0])
-              << ' ' << std::bitset<8>(states[1])
-              << ' ' << std::bitset<8>(states[2]) << std::endl;
+    std::cout << "States: " << std::bitset<11>(states[0])
+              << ' ' << std::bitset<9>(states[1])
+              << ' ' << std::bitset<10>(states[2]) << std::endl;
 
     return JiffyGenerator(l1, l2, l3);
 }
