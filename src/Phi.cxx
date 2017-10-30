@@ -8,9 +8,32 @@
 #include <iomanip>
 #include <stdexcept>
 
-#include "PhiInverse.h"
+#include "Phi.h"
 
-double PhiInverse::RationalApproximation(double t)
+
+double Phi::NormalCDF(double x) {
+    // constants
+    double a1 =  0.254829592;
+    double a2 = -0.284496736;
+    double a3 =  1.421413741;
+    double a4 = -1.453152027;
+    double a5 =  1.061405429;
+    double p  =  0.3275911;
+
+    // Save the sign of x
+    int sign = 1;
+    if (x < 0)
+        sign = -1;
+    x = fabs(x)/sqrt(2.0);
+
+    // A&S formula 7.1.26
+    double t = 1.0/(1.0 + p*x);
+    double y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*exp(-x*x);
+
+    return 0.5*(1.0 + sign*y);
+}
+
+double Phi::RationalApproximation(double t)
 {
     // Abramowitz and Stegun formula 26.2.23.
     // The absolute value of the error should be less than 4.5 e-4.
@@ -20,7 +43,7 @@ double PhiInverse::RationalApproximation(double t)
                (((d[2]*t + d[1])*t + d[0])*t + 1.0);
 }
 
-double PhiInverse::NormalCDFInverse(double p) {
+double Phi::NormalCDFInverse(double p) {
     if (p <= 0.0 || p >= 1.0) {
         std::stringstream os;
         os << "Invalid input argument (" << p

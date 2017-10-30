@@ -18,7 +18,8 @@ int main() {
                                        0b001000011011, 0b111111111,
                                        0b010000001001, 0b1111111111);
 
-    auto generator = cryptoAnalysis.generator();
+    // Insert correct N1* and N2* values
+    auto generator = cryptoAnalysis.generator(32, 32);
 
     for (int i = 0; i < sequence.size(); i++) {
         auto rand = generator.next();

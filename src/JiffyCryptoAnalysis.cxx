@@ -8,7 +8,7 @@
 #include "JiffyCryptoAnalysis.h"
 #include "LFSR.h"
 #include "JiffyGenerator.h"
-#include "PhiInverse.h"
+#include "Phi.h"
 
 JiffyCryptoAnalysis::JiffyCryptoAnalysis(
         std::string sequence,
@@ -20,60 +20,88 @@ JiffyCryptoAnalysis::JiffyCryptoAnalysis(
       equation2(equation2), cutoff2(cutoff2),
       equation3(equation3), cutoff3(cutoff3) { }
 
-JiffyGenerator JiffyCryptoAnalysis::generator() const {
+JiffyGenerator JiffyCryptoAnalysis::generator(int N1, int N2) const {
     double p1 = 0.25;
-    double N = this->sequence.length();
     double a = 0.01;
-    double C = N*p1 + PhiInverse::NormalCDFInverse(1-a)*std::sqrt(N*p1*(1-p1));
-    std::cout << "C=" << C << ' ' << PhiInverse::NormalCDFInverse(1-a) << std::endl;
+    double C1 = N1*p1 + Phi::NormalCDFInverse(1-a)*std::sqrt(N1*p1*(1-p1));
+    double C2 = N2*p1 + Phi::NormalCDFInverse(1-a)*std::sqrt(N2*p1*(1-p1));
 
-    auto state1 = this->findInitialValue(this->cutoff1, this->equation1, C);
-    auto state2 = this->findInitialValue(this->cutoff2, this->equation2, C);
+    auto states1 = this->findInitialValue(this->cutoff1, this->equation1, C1, N1);
+    auto states2 = this->findInitialValue(this->cutoff2, this->equation2, C2, N2);
 
-    auto l1 = LFSR(this->equation1, state1, this->cutoff1);
-    auto l2 = LFSR(this->equation2, state2, this->cutoff2);
-    auto state3 = this->findL3(l1, l2,
-                 this->cutoff3, this->equation3);
+    auto states = this->findL3(states1, states2, this->cutoff3, this->equation3, std::max(N1, N2));
 
-    auto l3 = LFSR(this->equation3, state3, this->cutoff3);
+    auto l1 = LFSR(this->equation1, states[0], this->cutoff1);
+    auto l2 = LFSR(this->equation2, states[1], this->cutoff2);
+    auto l3 = LFSR(this->equation3, states[2], this->cutoff3);
 
-    std::cout << "States: " << std::bitset<8>(state1) << ' ' << std::bitset<8>(state2) << ' ' << std::bitset<8>(state3) << std::endl;
+    std::cout << "States: " << std::bitset<8>(states[0])
+              << ' ' << std::bitset<8>(states[1])
+              << ' ' << std::bitset<8>(states[2]) << std::endl;
 
     return JiffyGenerator(l1, l2, l3);
 }
 
-uint64_t JiffyCryptoAnalysis::findL3(const LFSR &l1, const LFSR &l2, uint64_t cutoff, uint64_t equation) const {
-    for (uint64_t initialState = 0; initialState <= cutoff; initialState++) {
-        LFSR l3(equation, initialState, cutoff);
+std::vector<uint64_t> JiffyCryptoAnalysis::findL3(const std::vector<uint64_t> &states1,
+                                     const std::vector<uint64_t> &states2,
+                                     uint64_t cutoff, uint64_t equation, int N) const {
+    for (size_t i = 0; i < states1.size(); i++) {
+        for (size_t j = 0; j < states2.size(); j++) {
+            {
+                auto l1 = LFSR(this->equation1, states1[i], this->cutoff1);
+                auto l2 = LFSR(this->equation2, states2[j], this->cutoff2);
 
-        JiffyGenerator generator(l1, l2, l3);
+                int k;
+                for (k = 0; k < N; k++) {
+                    auto rand1 = l1.next();
+                    auto rand2 = l2.next();
 
-        int i;
-        for (i = 0; i < this->sequence.size(); i++) {
-            auto rand = generator.next();
+                    if (rand1 == rand2) {
+                        if ((rand1 != 0 && this->sequence[k] == '0')
+                            || (rand1 == 0 && this->sequence[k] == '1'))
+                            break;
+                    }
+                }
 
-            if ((rand != 0 && this->sequence[i] == '0')
-                || (rand == 0 && this->sequence[i] == '1'))
-                break;
-        }
+                if (k != N) {
+                    continue;
+                }
+            }
 
-        if (i == this->sequence.size()) {
-            return initialState;
+            auto l1 = LFSR(this->equation1, states1[i], this->cutoff1);
+            auto l2 = LFSR(this->equation2, states2[j], this->cutoff2);
+
+            for (uint64_t initialState = 0; initialState <= cutoff; initialState++) {
+                LFSR l3(equation, initialState, cutoff);
+
+                JiffyGenerator generator(l1, l2, l3);
+
+                int k;
+                for (k = 0; k < N; k++) {
+                    auto rand = generator.next();
+
+                    if ((rand != 0 && this->sequence[k] == '0')
+                        || (rand == 0 && this->sequence[k] == '1'))
+                        break;
+                }
+
+                if (k == N) {
+                    return { states1[i], states2[j], initialState };
+                }
+            }
         }
     }
 
     assert(false);
 }
 
-uint64_t JiffyCryptoAnalysis::findInitialValue(uint64_t cutoff, uint64_t equation, double C) const {
-    std::vector<int> rValues;
-    int Rmin = std::numeric_limits<int>::max();
-    uint64_t state = 0;
+std::vector<uint64_t> JiffyCryptoAnalysis::findInitialValue(uint64_t cutoff, uint64_t equation, double C, int N) const {
+    std::vector<uint64_t > states;
     for (uint64_t initialState = 0; initialState <= cutoff; initialState++) {
         LFSR l1(equation, initialState, cutoff);
 
         int R = 0;
-        for (int i = 0; i < this->sequence.size(); i++) {
+        for (int i = 0; i < N; i++) {
             auto rand = l1.next();
 
             if ((rand != 0 && this->sequence[i] == '0')
@@ -81,19 +109,10 @@ uint64_t JiffyCryptoAnalysis::findInitialValue(uint64_t cutoff, uint64_t equatio
                 R++;
         }
 
-        if (R < Rmin) {
-            Rmin = R;
-            state = initialState;
+        if (R < C) {
+            states.push_back(initialState);
         }
-        rValues.push_back(R);
     }
 
-    std::vector<int> rMatch;
-    auto predicate = [=] (const int &value) {
-        return value < C;
-    };
-    std::copy_if(rValues.begin(), rValues.end(), std::back_inserter(rMatch), predicate);
-    assert(rMatch.size() == 1);
-
-    return state;
+    return states;
 }

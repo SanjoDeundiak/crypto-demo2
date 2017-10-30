@@ -19,11 +19,13 @@ public:
                         uint64_t equation2, uint64_t cutoff2,
                         uint64_t equation3, uint64_t cutoff3);
 
-    JiffyGenerator generator() const;
+    JiffyGenerator generator(int N1, int N2) const;
 
 private:
-    uint64_t findInitialValue(uint64_t cutoff, uint64_t equation, double C) const;
-    uint64_t findL3(const LFSR &l1, const LFSR &l2, uint64_t cutoff, uint64_t equation) const;
+    std::vector<uint64_t> findInitialValue(uint64_t cutoff, uint64_t equation, double C, int N) const;
+    std::vector<uint64_t> findL3(const std::vector<uint64_t> &states1,
+                    const std::vector<uint64_t> &states2,
+                    uint64_t cutoff, uint64_t equation, int N) const;
 
     std::string sequence;
     uint64_t cutoff1, cutoff2, cutoff3;
